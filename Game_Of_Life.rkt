@@ -2,7 +2,7 @@
 ;; about the language level of this file in a form that our tools can easily process.
 #reader(lib "htdp-advanced-reader.ss" "lang")((modname Game_Of_Life) (read-case-sensitive #t) (teachpacks ((lib "image.rkt" "teachpack" "2htdp") (lib "universe.rkt" "teachpack" "2htdp"))) (htdp-settings #(#t constructor repeating-decimal #t #t none #f ((lib "image.rkt" "teachpack" "2htdp") (lib "universe.rkt" "teachpack" "2htdp")) #f)))
 (define W-SIZE 1000)
-(define NumOfSqrs 100)
+(define NumOfSqrs 10)
 (define SQ-SZ (/ W-SIZE NumOfSqrs))
 
 (define liveCell (overlay (square SQ-SZ 'outline "black") (square SQ-SZ 'solid "red")))
@@ -38,18 +38,31 @@
 ;list of neighbors {Give the position -1 EX: (neighbors (- (posn-x ws) 1) (- (posn-y ws) 1))}
 (define (neighbors x y x1 y1)
   (cond
-    [(> x (+ x1 2)) (neighbors x1 (+ y 1) x1 y1)]
-    [(> y (+ y1 2)) empty]
+    [(< x 1) (neighbors NumOfSqrs y x1 y1)]
+    [(< y 1) (neighbors x NumOfSqrs x1 y1)]
+    [(> x NumOfSqrs) (neighbors 1 y x1 y1)]
+    [(> y NumOfSqrs) (neighbors x 1 x1 y1)]
+    [(= x (+ x1 2)) (neighbors (- x1 1) (+ y 1) x1 y1)]
+    [(= y (+ y1 2)) empty]
+    [(and (= x x1) (= y y1)) (neighbors (+ x1 1) y x1 y1)]
     [else (cons (make-posn x y) (neighbors (+ x 1) y x1 y1))]))
 
 ;Check number of live neighbors
 ;gets the position of the cell and counts the number of live squares next to it there are
 ; LON-> List of Neigbors
-(define (check-neighbors lon )
+; Grid = the list of all the squares
+; crd = the cordinates of the square to check neighbors
+; n = the number of live neighbors (should always be set to 0 when called)
+(define (check-neighbors ws lon grid crd n)
   (cond
-    []
-    []
+    [(empty? lon) n]
+    [(empty? grid) (check-neighbors ws (rest lon) (WS-grd ws) crd n)]
+    [(and (posn=? (squares-position (first grid)) (first lon)) (squares-isLiving? (first grid)))
+     (check-neighbors ws (rest lon) (WS-grd ws) crd (+ 1 n))]
+    [else (check-neighbors ws lon (rest grid) crd n)]
     ))
+
+
 
 
 (define (draw-grid ws grid image)
@@ -81,6 +94,12 @@
      (change-square ws (WS-grd ws) (make-posn (make-simple x 0 SQ-SZ 1) (make-simple y 0 SQ-SZ 1)))]
     [else ws]))
 
+
+;if active
+; check-live neighbors for the first of the ws-grd using the neighbors function for lon
+; - cond for the rules based on n gathered from check-neighbors
+; - - replace the square based on rules
+; - - append to the rest of the grid
 (define (tock ws)
   ws)
 
