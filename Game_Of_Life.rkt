@@ -1,14 +1,17 @@
 ;; The first three lines of this file were inserted by DrRacket. They record metadata
 ;; about the language level of this file in a form that our tools can easily process.
 #reader(lib "htdp-advanced-reader.ss" "lang")((modname Game_Of_Life) (read-case-sensitive #t) (teachpacks ((lib "image.rkt" "teachpack" "2htdp") (lib "universe.rkt" "teachpack" "2htdp"))) (htdp-settings #(#t constructor repeating-decimal #t #t none #f ((lib "image.rkt" "teachpack" "2htdp") (lib "universe.rkt" "teachpack" "2htdp")) #f)))
+;=====================================VARIABLES/CONSTANTS============================================
 (define W-SIZE 1000)
 (define NumOfSqrs 10)
 (define SQ-SZ (/ W-SIZE NumOfSqrs))
 
 (define liveCell (overlay (square SQ-SZ 'outline "black") (square SQ-SZ 'solid "red")))
 (define BACKGROUND (square W-SIZE 'solid "black"))
-(define-struct WS (grd))
+(define-struct WS (grd isActive?))
 (define-struct squares (position isLiving?))
+
+;=======================================MAKING THE WORLD==============================================
 
 (define (generate-grid x y)
   (cond
@@ -16,8 +19,48 @@
     [(> y NumOfSqrs) empty]
     [else (cons (make-squares (make-posn x y) false) (generate-grid (+ x 1) y))]))
 
-(define INIT-WS (make-WS (generate-grid 1 1)))
+(define INIT-WS (make-WS (generate-grid 1 1) false))
 
+(define (draw-grid ws grid image)
+  (cond
+    [(empty? grid) image]
+    [(not (squares-isLiving? (first grid))) (draw-grid ws (rest grid) image)]
+    [else (place-image
+           liveCell
+           (- ( * SQ-SZ (posn-x (squares-position (first grid)))) (/ SQ-SZ 2))
+           (- ( * SQ-SZ (posn-y (squares-position (first grid)))) (/ SQ-SZ 2))
+           (draw-grid ws (rest grid) image))])) 
+
+(define (render ws)
+  (draw-grid ws (WS-grd ws) BACKGROUND))
+
+;======================================INPUT CONTROLS===================================================
+(define (key-handler ws key)
+  (cond
+    [(key=? key "up")
+     (change-square
+      ws
+      (WS-grd ws)
+      (make-posn (+ 1 (random NumOfSqrs)) (+ 1 (random NumOfSqrs))))]
+    [(key=? key "r")
+     INIT-WS]
+    [(key=? key " ")
+     (make-WS (WS-grd ws) (if (WS-isActive? ws) false true))]
+    [else ws]))
+
+
+(define (make-simple n start end p)
+  (cond
+    [(and (>= n start) (<= n end)) p]
+    [else (make-simple n end (+ end SQ-SZ) (+ p 1))]))
+
+(define (mouse-handler ws x y mouse )
+  (cond
+    [(string=? mouse "button-down")
+     (change-square ws (WS-grd ws) (make-posn (make-simple x 0 SQ-SZ 1) (make-simple y 0 SQ-SZ 1)))]
+    [else ws]))
+
+;========================================SIMULATION HARDWARE=============================================
 ;GAME OF LIFE RULES
 ; Neighbors < 2 and live = dead 
 (define (underpopulation n)
@@ -62,37 +105,46 @@
     [else (check-neighbors ws lon (rest grid) crd n)]
     ))
 
-
-
-
-(define (draw-grid ws grid image)
+;Update Board
+;handles generating a new board every update
+(define (update-board ws grid)
   (cond
-    [(empty? grid) image]
-    [(not (squares-isLiving? (first grid))) (draw-grid ws (rest grid) image)]
-    [else (place-image liveCell (- ( * SQ-SZ (posn-x (squares-position (first grid)))) (/ SQ-SZ 2)) (- ( * SQ-SZ (posn-y (squares-position (first grid)))) (/ SQ-SZ 2)) (draw-grid ws (rest grid) image))])) 
-
-(define (render ws)
-  (draw-grid ws (WS-grd ws) BACKGROUND))
-
-(define (key-handler ws key)
-  (cond
-    [(key=? key "up")
-     (change-square ws (WS-grd ws) (make-posn (+ 1 (random NumOfSqrs)) (+ 1 (random NumOfSqrs))))]
-    [(key=? key "r")
-     INIT-WS]
-    [else ws]))
-
-
-(define (make-simple n start end p)
-  (cond
-    [(and (>= n start) (<= n end)) p]
-    [else (make-simple n end (+ end SQ-SZ) (+ p 1))]))
-
-(define (mouse-handler ws x y mouse )
-  (cond
-    [(string=? mouse "button-down")
-     (change-square ws (WS-grd ws) (make-posn (make-simple x 0 SQ-SZ 1) (make-simple y 0 SQ-SZ 1)))]
-    [else ws]))
+    [(empty? grid) ws]
+    [(squares-isLiving? (first grid))
+     (cond
+       [(underpopulation (check-neighbors
+                          ws
+                          (neighbors
+                           (posn-x (squares-position (first grid))) (posn-y (squares-position (first grid)))
+                           (posn-x (squares-position (first grid))) (posn-y (squares-position (first grid))))
+                          (WS-grd ws)
+                          (squares-position (first grid))
+                          0))
+        (make-WS (append (replace-square ws grid (squares-position (first grid))))
+                      (cons (make-squares (squares-position (first grid)) false) empty) (WS-isActive? ws))]
+       [(overpopulation (check-neighbors
+                         ws
+                         (neighbors
+                          (posn-x (squares-position (first grid))) (posn-y (squares-position (first grid)))
+                          (posn-x (squares-position (first grid))) (posn-y (squares-position (first grid))))
+                         (WS-grd ws)
+                         (squares-position (first grid))
+                         0))
+        (make-WS (append (replace-square ws grid (squares-position (first grid))))
+                      (cons (make-squares (squares-position (first grid)) false) empty) (WS-isActive? ws))]
+       [else ws])]
+    [(reproduction (check-neighbors
+                    ws
+                    (neighbors
+                     (posn-x (squares-position (first grid))) (posn-y (squares-position (first grid)))
+                     (posn-x (squares-position (first grid))) (posn-y (squares-position (first grid))))
+                    (WS-grd ws)
+                    (squares-position (first grid))
+                    0))
+     (make-WS (append (replace-square ws grid (squares-position (first grid)))
+                      (cons (make-squares (squares-position (first grid)) true) empty)) (WS-isActive? ws))]
+    [else (update-board ws (rest grid))]))
+   
 
 
 ;if active
@@ -101,8 +153,12 @@
 ; - - replace the square based on rules
 ; - - append to the rest of the grid
 (define (tock ws)
-  ws)
+  (cond
+    [(WS-isActive? ws) (update-board ws (WS-grd ws))]
+    [else ws]))
 
+
+;======================================TUNRING SQUARES ON OFF=============================================
 (define (posn=? p1 p2)
   (and (= (posn-x p1) (posn-x p2)) (= (posn-y p1) (posn-y p2))))
 
@@ -118,13 +174,13 @@
        (make-squares
         [make-posn (posn-x crd) (posn-y crd)]
         true)
-       (WS-grd ws)))]
+       (WS-grd ws)) (WS-isActive? ws))]
     [(posn=? (squares-position (first grid)) crd)
      (make-WS (append (replace-square ws grid crd)
-                      (cons (make-squares crd (if (squares-isLiving? (first grid)) false true)) empty)))]
+                      (cons (make-squares crd (if (squares-isLiving? (first grid)) false true)) empty)) (WS-isActive? ws))]
     [else (change-square ws (rest grid) crd)]))
    
-
+;=========================================================================================================
 
 (define (main ws)
   (big-bang ws
@@ -134,5 +190,7 @@
     [on-tick tock 1]
     ;[stop-when game-over]
     ))
+
+(main INIT-WS)
 
 (main INIT-WS)
