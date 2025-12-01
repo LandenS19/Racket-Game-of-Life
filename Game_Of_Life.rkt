@@ -6,7 +6,7 @@
 (define NumOfSqrs 10)
 (define SQ-SZ (/ W-SIZE NumOfSqrs))
 
-(define liveCell (overlay (square SQ-SZ 'outline "black") (square SQ-SZ 'solid "red")))
+(define liveCell (overlay (square SQ-SZ 'outline "black") (square SQ-SZ 'solid "white")))
 (define BACKGROUND (square W-SIZE 'solid "black"))
 (define-struct WS (grd isActive?))
 (define-struct squares (position isLiving?))
@@ -85,8 +85,13 @@
     [(< y 1) (neighbors x NumOfSqrs x1 y1)]
     [(> x NumOfSqrs) (neighbors 1 y x1 y1)]
     [(> y NumOfSqrs) (neighbors x 1 x1 y1)]
-    [(= x (+ x1 2)) (neighbors (- x1 1) (+ y 1) x1 y1)]
-    [(= y (+ y1 2)) empty]
+    [(= x (if
+           (>= (+ x1 2) 11)
+           (- (+ x1 2) 10) (+ x1 2)))
+        (neighbors (- x1 1) (+ y 1) x1 y1)]
+    [(= y (if
+           (>= (+ y1 2) 11)
+           (- (+ y1 2) 10) (+ y1 2))) empty]
     [(and (= x x1) (= y y1)) (neighbors (+ x1 1) y x1 y1)]
     [else (cons (make-posn x y) (neighbors (+ x 1) y x1 y1))]))
 
@@ -115,29 +120,29 @@
        [(underpopulation (check-neighbors
                           ws
                           (neighbors
-                           (posn-x (squares-position (first grid))) (posn-y (squares-position (first grid)))
+                           (- (posn-x (squares-position (first grid))) 1) (- (posn-y (squares-position (first grid))) 1)
                            (posn-x (squares-position (first grid))) (posn-y (squares-position (first grid))))
                           (WS-grd ws)
                           (squares-position (first grid))
                           0))
-        (make-WS (append (replace-square ws grid (squares-position (first grid))))
-                      (cons (make-squares (squares-position (first grid)) false) empty) (WS-isActive? ws))]
+        (make-WS (append (replace-square ws grid (squares-position (first grid)))
+                      (cons (make-squares (squares-position (first grid)) true) empty))  (WS-isActive? ws))]
        [(overpopulation (check-neighbors
                          ws
                          (neighbors
-                          (posn-x (squares-position (first grid))) (posn-y (squares-position (first grid)))
-                          (posn-x (squares-position (first grid))) (posn-y (squares-position (first grid))))
+                           (- (posn-x (squares-position (first grid))) 1) (- (posn-y (squares-position (first grid))) 1)
+                           (posn-x (squares-position (first grid))) (posn-y (squares-position (first grid))))
                          (WS-grd ws)
                          (squares-position (first grid))
                          0))
-        (make-WS (append (replace-square ws grid (squares-position (first grid))))
-                      (cons (make-squares (squares-position (first grid)) false) empty) (WS-isActive? ws))]
+        (make-WS (append (replace-square ws grid (squares-position (first grid)))
+                      (cons (make-squares (squares-position (first grid)) true) empty))  (WS-isActive? ws))]
        [else ws])]
     [(reproduction (check-neighbors
                     ws
                     (neighbors
-                     (posn-x (squares-position (first grid))) (posn-y (squares-position (first grid)))
-                     (posn-x (squares-position (first grid))) (posn-y (squares-position (first grid))))
+                           (- (posn-x (squares-position (first grid))) 1) (- (posn-y (squares-position (first grid))) 1)
+                           (posn-x (squares-position (first grid))) (posn-y (squares-position (first grid))))
                     (WS-grd ws)
                     (squares-position (first grid))
                     0))
@@ -187,10 +192,8 @@
     [on-draw render]
     [on-key key-handler]
     [on-mouse mouse-handler]
-    [on-tick tock 1]
+    [on-tick tock .1]
     ;[stop-when game-over]
     ))
-
-(main INIT-WS)
 
 (main INIT-WS)
