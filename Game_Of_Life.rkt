@@ -12,7 +12,7 @@
 (define-struct squares (position isLiving?))
 
 ;=======================================MAKING THE WORLD==============================================
- 
+
 (define (generate-grid x y)
   (cond
     [(> x NumOfSqrs) (generate-grid 1 (+ y 1))]
@@ -22,7 +22,7 @@
 (define INIT-WS (make-WS (generate-grid 1 1) false))
 
 (define (draw-grid ws grid image)
-  (cond 
+  (cond
     [(empty? grid) image]
     [(not (squares-isLiving? (first grid))) (draw-grid ws (rest grid) image)]
     [else (place-image
@@ -86,12 +86,12 @@
     [(> x NumOfSqrs) (neighbors 1 y x1 y1)]
     [(> y NumOfSqrs) (neighbors x 1 x1 y1)]
     [(= x (if
-           (>= (+ x1 2) 11)
-           (- (+ x1 2) 10) (+ x1 2)))
+           (>= (+ x1 2) (+ NumOfSqrs 1))
+           (- (+ x1 2) NumOfSqrs) (+ x1 2)))
         (neighbors (- x1 1) (+ y 1) x1 y1)]
     [(= y (if
-           (>= (+ y1 2) 11)
-           (- (+ y1 2) 10) (+ y1 2))) empty]
+           (>= (+ y1 2) (+ NumOfSqrs 1))
+           (- (+ y1 2) NumOfSqrs) (+ y1 2))) empty]
     [(and (= x x1) (= y y1)) (neighbors (+ x1 1) y x1 y1)]
     [else (cons (make-posn x y) (neighbors (+ x 1) y x1 y1))]))
 
@@ -112,43 +112,42 @@
 
 ;Update Board
 ;handles generating a new board every update
-(define (update-board ws grid new-grid)
-  (cond
-    [(empty? grid) (make-WS new-grid (WS-isActive? ws))]
-    [(squares-isLiving? (first grid))
-     (cond
-       [(underpopulation (check-neighbors
-                          ws
-                          (neighbors
-                           (- (posn-x (squares-position (first grid))) 1) (- (posn-y (squares-position (first grid))) 1)
-                           (posn-x (squares-position (first grid))) (posn-y (squares-position (first grid))))
-                          (WS-grd ws)
-                          (squares-position (first grid))
-                          0))
-        (update-board ws (rest grid) (append (replace-square ws grid (squares-position (first grid)))
-                                             (cons (make-squares (squares-position (first grid)) false) empty)))]
-       [(overpopulation (check-neighbors
-                         ws
-                         (neighbors
-                           (- (posn-x (squares-position (first grid))) 1) (- (posn-y (squares-position (first grid))) 1)
-                           (posn-x (squares-position (first grid))) (posn-y (squares-position (first grid))))
-                         (WS-grd ws)
-                         (squares-position (first grid))
-                         0))
-        (update-board ws (rest grid) (append (replace-square ws grid (squares-position (first grid)))
-                                             (cons (make-squares (squares-position (first grid)) false) empty)))]
-       [else ws])]
-    [(reproduction (check-neighbors
-                    ws
-                    (neighbors
-                           (- (posn-x (squares-position (first grid))) 1) (- (posn-y (squares-position (first grid))) 1)
-                           (posn-x (squares-position (first grid))) (posn-y (squares-position (first grid))))
-                    (WS-grd ws)
-                    (squares-position (first grid))
-                    0))
-     (update-board ws (rest grid) (append (replace-square ws grid (squares-position (first grid)))
-                                          (cons (make-squares (squares-position (first grid)) true) empty)))]
-    [else (update-board ws (rest grid) (append (list (first grid)) new-grid))]))
+(define (update-board ws grid)
+  (local [(define (make-new-grid ws grid new-grid)
+            (cond
+              [(empty? grid) (make-WS new-grid (WS-isActive? ws))]
+              [(squares-isLiving? (first grid))
+               (cond
+                 [(underpopulation (check-neighbors
+                                    ws
+                                    (neighbors
+                                     (- (posn-x (squares-position (first grid))) 1) (- (posn-y (squares-position (first grid))) 1)
+                                     (posn-x (squares-position (first grid))) (posn-y (squares-position (first grid))))
+                                    (WS-grd ws)
+                                    (squares-position (first grid))
+                                    0))
+                  (make-new-grid ws (rest grid) (cons (make-squares (squares-position (first grid)) false) new-grid))]
+                 [(overpopulation (check-neighbors
+                                   ws
+                                   (neighbors
+                                    (- (posn-x (squares-position (first grid))) 1) (- (posn-y (squares-position (first grid))) 1)
+                                    (posn-x (squares-position (first grid))) (posn-y (squares-position (first grid))))
+                                   (WS-grd ws)
+                                   (squares-position (first grid))
+                                   0))
+                  (make-new-grid ws (rest grid) (cons (make-squares (squares-position (first grid)) false) new-grid))]
+                 [else (make-new-grid ws (rest grid) (cons (first grid) new-grid))])]
+              [(reproduction (check-neighbors
+                              ws
+                              (neighbors
+                               (- (posn-x (squares-position (first grid))) 1) (- (posn-y (squares-position (first grid))) 1)
+                               (posn-x (squares-position (first grid))) (posn-y (squares-position (first grid))))
+                              (WS-grd ws)
+                              (squares-position (first grid))
+                              0))
+               (make-new-grid ws (rest grid) (cons (make-squares (squares-position (first grid)) true) new-grid))]
+              [else (make-new-grid ws (rest grid) (cons (first grid) new-grid))]))]
+    (make-new-grid ws grid (list ))))
    
 
 
@@ -159,7 +158,7 @@
 ; - - append to the rest of the grid
 (define (tock ws)
   (cond
-    [(WS-isActive? ws) (update-board ws (WS-grd ws) (list empty))]
+    [(WS-isActive? ws) (update-board ws (WS-grd ws))]
     [else ws]))
 
 
@@ -192,7 +191,7 @@
     [on-draw render]
     [on-key key-handler]
     [on-mouse mouse-handler]
-    [on-tick tock .1]
+    [on-tick tock .2]
     ;[stop-when game-over]
     ))
 
