@@ -12,7 +12,7 @@
 (define-struct squares (position isLiving?))
 
 ;=======================================MAKING THE WORLD==============================================
-
+ 
 (define (generate-grid x y)
   (cond
     [(> x NumOfSqrs) (generate-grid 1 (+ y 1))]
@@ -22,7 +22,7 @@
 (define INIT-WS (make-WS (generate-grid 1 1) false))
 
 (define (draw-grid ws grid image)
-  (cond
+  (cond 
     [(empty? grid) image]
     [(not (squares-isLiving? (first grid))) (draw-grid ws (rest grid) image)]
     [else (place-image
@@ -112,9 +112,9 @@
 
 ;Update Board
 ;handles generating a new board every update
-(define (update-board ws grid)
+(define (update-board ws grid new-grid)
   (cond
-    [(empty? grid) ws]
+    [(empty? grid) (make-WS new-grid (WS-isActive? ws))]
     [(squares-isLiving? (first grid))
      (cond
        [(underpopulation (check-neighbors
@@ -125,8 +125,8 @@
                           (WS-grd ws)
                           (squares-position (first grid))
                           0))
-        (make-WS (append (replace-square ws grid (squares-position (first grid)))
-                      (cons (make-squares (squares-position (first grid)) true) empty))  (WS-isActive? ws))]
+        (update-board ws (rest grid) (append (replace-square ws grid (squares-position (first grid)))
+                                             (cons (make-squares (squares-position (first grid)) false) empty)))]
        [(overpopulation (check-neighbors
                          ws
                          (neighbors
@@ -135,8 +135,8 @@
                          (WS-grd ws)
                          (squares-position (first grid))
                          0))
-        (make-WS (append (replace-square ws grid (squares-position (first grid)))
-                      (cons (make-squares (squares-position (first grid)) true) empty))  (WS-isActive? ws))]
+        (update-board ws (rest grid) (append (replace-square ws grid (squares-position (first grid)))
+                                             (cons (make-squares (squares-position (first grid)) false) empty)))]
        [else ws])]
     [(reproduction (check-neighbors
                     ws
@@ -146,9 +146,9 @@
                     (WS-grd ws)
                     (squares-position (first grid))
                     0))
-     (make-WS (append (replace-square ws grid (squares-position (first grid)))
-                      (cons (make-squares (squares-position (first grid)) true) empty)) (WS-isActive? ws))]
-    [else (update-board ws (rest grid))]))
+     (update-board ws (rest grid) (append (replace-square ws grid (squares-position (first grid)))
+                                          (cons (make-squares (squares-position (first grid)) true) empty)))]
+    [else (update-board ws (rest grid) (append (list (first grid)) new-grid))]))
    
 
 
@@ -159,7 +159,7 @@
 ; - - append to the rest of the grid
 (define (tock ws)
   (cond
-    [(WS-isActive? ws) (update-board ws (WS-grd ws))]
+    [(WS-isActive? ws) (update-board ws (WS-grd ws) (list empty))]
     [else ws]))
 
 
