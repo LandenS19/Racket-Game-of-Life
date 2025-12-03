@@ -19,7 +19,9 @@
     [(> y NumOfSqrs) empty]
     [else (cons (make-squares (make-posn x y) false) (generate-grid (+ x 1) y))]))
 
-(define INIT-WS (make-WS (generate-grid 1 1) false))
+(define STARTING-GRID (generate-grid 1 1))
+
+(define INIT-WS (make-WS STARTING-GRID false))
 
 (define (draw-grid ws grid image)
   (cond
