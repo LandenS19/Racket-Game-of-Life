@@ -9,7 +9,7 @@
 (define liveCell (overlay (square SQ-SZ 'outline "black") (square SQ-SZ 'solid "white")))
 (define BACKGROUND (square W-SIZE 'solid "black"))
 (define-struct WS (grd isActive?))
-(define-struct squares (position isLiving?))
+(define-struct squares (position isLiving?))   ;ADD THE LIST OF NEIGHBORS TO THE STRUCT SO IT ISN'T MAKING A NEW LIST OF NEIGHBORS EVERY TIME
 
 ;=======================================MAKING THE WORLD==============================================
 
