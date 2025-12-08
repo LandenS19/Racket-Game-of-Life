@@ -3,7 +3,7 @@
 #reader(lib "htdp-advanced-reader.ss" "lang")((modname Game_Of_Life) (read-case-sensitive #t) (teachpacks ((lib "image.rkt" "teachpack" "2htdp") (lib "universe.rkt" "teachpack" "2htdp"))) (htdp-settings #(#t constructor repeating-decimal #t #t none #f ((lib "image.rkt" "teachpack" "2htdp") (lib "universe.rkt" "teachpack" "2htdp")) #f)))
 ;=====================================VARIABLES/CONSTANTS============================================
 (define W-SIZE 1000)
-(define NumOfSqrs 10)
+(define NumOfSqrs 16)
 (define SQ-SZ (/ W-SIZE NumOfSqrs))
 
 (define liveCell (overlay (square SQ-SZ 'outline "black") (square SQ-SZ 'solid "white")))
@@ -39,15 +39,20 @@
 
 (define INIT-WS (make-WS STARTING-GRID false))
 
-(define (draw-grid ws grid image)
-  (cond
-    [(empty? grid) image]
-    [(not (squares-isLiving? (first grid))) (draw-grid ws (rest grid) image)]
-    [else (place-image
-           liveCell
-           (- ( * SQ-SZ (posn-x (squares-position (first grid)))) (/ SQ-SZ 2))
-           (- ( * SQ-SZ (posn-y (squares-position (first grid)))) (/ SQ-SZ 2))
-           (draw-grid ws (rest grid) image))]))
+(define (draw-grid ws grid image)   ;TODO: use local to improve speed
+  (local [(define (place-grid ws grid new-grid)
+            (cond
+              [(empty? grid) new-grid]
+              [(not (squares-isLiving? (first grid))) (place-grid ws (rest grid) new-grid)]
+              [else (place-grid
+                     ws
+                     (rest grid)
+                     (place-image
+                     liveCell
+                     (- ( * SQ-SZ (posn-x (squares-position (first grid)))) (/ SQ-SZ 2))
+                     (- ( * SQ-SZ (posn-y (squares-position (first grid)))) (/ SQ-SZ 2))
+                     new-grid))]))]
+    (place-grid ws grid image)))
 
 (define (render ws)
   (draw-grid ws (WS-grd ws) BACKGROUND))
@@ -126,14 +131,18 @@
                                     (WS-grd ws)
                                     (squares-position (first grid))
                                     0))
-                  (make-new-grid ws (rest grid) (cons (make-squares (squares-position (first grid)) false (squares-neighbors (first grid))) new-grid))]
+                  (make-new-grid ws
+                                 (rest grid)
+                                 (cons (make-squares (squares-position (first grid)) false (squares-neighbors (first grid))) new-grid))]
                  [(overpopulation (check-neighbors
                                    ws
                                    (squares-neighbors (first grid))
                                    (WS-grd ws)
                                    (squares-position (first grid))
                                    0))
-                  (make-new-grid ws (rest grid) (cons (make-squares (squares-position (first grid)) false (squares-neighbors (first grid))) new-grid))]
+                  (make-new-grid ws
+                                 (rest grid)
+                                 (cons (make-squares (squares-position (first grid)) false (squares-neighbors (first grid))) new-grid))]
                  [else (make-new-grid ws (rest grid) (cons (first grid) new-grid))])]
               [(reproduction (check-neighbors
                               ws
@@ -141,7 +150,9 @@
                               (WS-grd ws)
                               (squares-position (first grid))
                               0))
-               (make-new-grid ws (rest grid) (cons (make-squares (squares-position (first grid)) true (squares-neighbors (first grid))) new-grid))]
+               (make-new-grid ws
+                              (rest grid)
+                              (cons (make-squares (squares-position (first grid)) true (squares-neighbors (first grid))) new-grid))]
               [else (make-new-grid ws (rest grid) (cons (first grid) new-grid))]))]
     (make-new-grid ws grid (list ))))
    
@@ -189,8 +200,7 @@
     [on-draw render]
     [on-key key-handler]
     [on-mouse mouse-handler]
-    [on-tick tock .2]
-    ;[stop-when game-over]
+    [on-tick tock .5]
     ))
 
 (main INIT-WS)
