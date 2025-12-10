@@ -3,7 +3,7 @@
 #reader(lib "htdp-advanced-reader.ss" "lang")((modname Game_Of_Life) (read-case-sensitive #t) (teachpacks ((lib "image.rkt" "teachpack" "2htdp") (lib "universe.rkt" "teachpack" "2htdp"))) (htdp-settings #(#t constructor repeating-decimal #t #t none #f ((lib "image.rkt" "teachpack" "2htdp") (lib "universe.rkt" "teachpack" "2htdp")) #f)))
 ;=====================================VARIABLES/CONSTANTS============================================
 (define W-SIZE 1000)
-(define NumOfSqrs 16)
+(define NumOfSqrs 20)
 (define SQ-SZ (/ W-SIZE NumOfSqrs))
 
 (define liveCell (overlay (square SQ-SZ 'outline "black") (square SQ-SZ 'solid "white")))
@@ -39,7 +39,7 @@
 
 (define INIT-WS (make-WS STARTING-GRID false))
 
-(define (draw-grid ws grid image)   ;TODO: use local to improve speed
+(define (draw-grid ws grid image)
   (local [(define (place-grid ws grid new-grid)
             (cond
               [(empty? grid) new-grid]
@@ -103,18 +103,15 @@
 
 
 ;Check number of live neighbors
-;gets the position of the cell and counts the number of live squares next to it there are
-; LON-> List of Neigbors
+;counts how many neighbors are living
 ; Grid = the list of all the squares
-; crd = the cordinates of the square to check neighbors
 ; n = the number of live neighbors (should always be set to 0 when called)
-(define (check-neighbors ws lon grid crd n)
+(define (check-neighbors grid n)
   (cond
-    [(empty? lon) n]
-    [(empty? grid) (check-neighbors ws (rest lon) (WS-grd ws) crd n)]
-    [(and (posn=? (squares-position (first grid)) (first lon)) (squares-isLiving? (first grid)))
-     (check-neighbors ws (rest lon) (WS-grd ws) crd (+ 1 n))]
-    [else (check-neighbors ws lon (rest grid) crd n)]
+    [(empty? grid) n]
+    [(squares-isLiving? (first grid))
+     (check-neighbors (rest grid) (+ 1 n))]
+    [else (check-neighbors (rest grid) n)]
     ))
 
 ;Update Board
@@ -126,29 +123,20 @@
               [(squares-isLiving? (first grid))
                (cond
                  [(underpopulation (check-neighbors
-                                    ws
-                                    (squares-neighbors (first grid))
-                                    (WS-grd ws)
-                                    (squares-position (first grid))
+                                    (filter (lambda (p) (member? (squares-position p) (squares-neighbors (first grid)))) (WS-grd ws))
                                     0))
                   (make-new-grid ws
                                  (rest grid)
                                  (cons (make-squares (squares-position (first grid)) false (squares-neighbors (first grid))) new-grid))]
                  [(overpopulation (check-neighbors
-                                   ws
-                                   (squares-neighbors (first grid))
-                                   (WS-grd ws)
-                                   (squares-position (first grid))
+                                   (filter (lambda (p) (member? (squares-position p) (squares-neighbors (first grid)))) (WS-grd ws))
                                    0))
                   (make-new-grid ws
                                  (rest grid)
                                  (cons (make-squares (squares-position (first grid)) false (squares-neighbors (first grid))) new-grid))]
                  [else (make-new-grid ws (rest grid) (cons (first grid) new-grid))])]
               [(reproduction (check-neighbors
-                              ws
-                              (squares-neighbors (first grid))
-                              (WS-grd ws)
-                              (squares-position (first grid))
+                              (filter (lambda (p) (member? (squares-position p) (squares-neighbors (first grid)))) (WS-grd ws))
                               0))
                (make-new-grid ws
                               (rest grid)
@@ -200,7 +188,7 @@
     [on-draw render]
     [on-key key-handler]
     [on-mouse mouse-handler]
-    [on-tick tock .5]
+    [on-tick tock .2]
     ))
 
 (main INIT-WS)
