@@ -25,18 +25,21 @@
     [(and (= x x1) (= y y1)) (set-neighbors (+ x1 1) y x1 y1)]
     [else (cons (make-posn x y) (set-neighbors (+ x 1) y x1 y1))]))
 
-(define (generate-grid x y)
+
+;Creates the list of squares for the grid
+(define (generate-grid x y) 
   (cond
     [(> x NumOfSqrs) (generate-grid 1 (+ y 1))]
     [(> y NumOfSqrs) empty]
     [else (cons (make-squares (make-posn x y) false (set-neighbors (- x 1) (- y 1) x y)) (generate-grid (+ x 1) y))]))
 
-(define STARTING-GRID (generate-grid 1 1))
+(define STARTING-GRID (generate-grid 1 1))   ;Initial grid of non-living squares
 
-(define INIT-WS (make-WS STARTING-GRID false false))
+(define INIT-WS (make-WS STARTING-GRID false false))  ;Initial World State
 
+;Draws a square if the square is lving
 (define (draw-grid ws grid image)
-  (local [(define (place-grid ws grid new-grid)
+  (local [(define (place-grid ws grid new-grid)   ;Uses local to make the whole image before displaying it.
             (cond
               [(empty? grid) new-grid]
               [(not (squares-isLiving? (first grid))) (place-grid ws (rest grid) new-grid)]
@@ -45,40 +48,44 @@
                      (rest grid)
                      (place-image
                      liveCell
-                     (- ( * SQ-SZ (posn-x (squares-position (first grid)))) (/ SQ-SZ 2))
-                     (- ( * SQ-SZ (posn-y (squares-position (first grid)))) (/ SQ-SZ 2))
+                     (- ( * SQ-SZ (posn-x (squares-position (first grid)))) (/ SQ-SZ 2))  ;Converts x coordinate to actual x
+                     (- ( * SQ-SZ (posn-y (squares-position (first grid)))) (/ SQ-SZ 2))  ;Converts y coordinate to acutal y
                      new-grid))]))]
     (place-grid ws grid image)))
 
+;Called to make the image
 (define (render ws)
   (draw-grid ws (WS-grd ws) BACKGROUND))
 
 ;======================================INPUT CONTROLS===================================================
+;Handles all Key Inputs
 (define (key-handler ws key)
   (cond
-    [(key=? key "up")
+    [(key=? key "up")  ;If the up arrow key is pressed, changes the life state of a random square.
      (change-square
       ws
       (WS-grd ws)
       (make-posn (+ 1 (random NumOfSqrs)) (+ 1 (random NumOfSqrs))))]
-    [(key=? key "r")
+    [(key=? key "r")  ;If the r key is pressed it resets the grid
      INIT-WS]
-    [(key=? key " ")
+    [(key=? key " ")  ;If the space key is pressed it Activates the simulation
      (make-WS (WS-grd ws) (if (WS-isActive? ws) false true) (WS-place-glider? ws))]
-    [(key=? key "1")
+    [(key=? key "1")  ;If the 1 number key is pressed, toggles glider placement
      (make-WS (WS-grd ws) (WS-isActive? ws) (if (WS-place-glider? ws) false true))]
     [else ws]))
 
-
+;Converts real position to coordinate position
 (define (make-simple n start end p)
   (cond
     [(and (>= n start) (<= n end)) p]
     [else (make-simple n end (+ end SQ-SZ) (+ p 1))]))
 
+;Handles all mouse inputs
 (define (mouse-handler ws x y mouse )
   (cond
-    [(string=? mouse "button-down")
+    [(string=? mouse "button-down")  ;If the mouse clicks
      (cond
+       ;If place glider is active, places a glider
        [(WS-place-glider? ws) (place-glider
                                ws
                                (make-glider-list
@@ -89,6 +96,7 @@
                                 ws
                                 (make-simple x 0 SQ-SZ 1)
                                 (make-simple y 0 SQ-SZ 1)))]
+       ;Else it just toggles the squares living state
        [else (change-square ws (WS-grd ws) (make-posn (make-simple x 0 SQ-SZ 1) (make-simple y 0 SQ-SZ 1)))])]
     [else ws]))
 
@@ -128,38 +136,40 @@
 (define (update-board ws grid)
   (local [(define (make-new-grid ws grid new-grid)
             (cond
-              [(empty? grid) (make-WS new-grid (WS-isActive? ws) (WS-place-glider? ws))]
-              [(squares-isLiving? (first grid))
+              [(empty? grid) (make-WS new-grid (WS-isActive? ws) (WS-place-glider? ws))]  
+              [(squares-isLiving? (first grid))  ;If the square is alive                   
                (cond
-                 [(underpopulation (check-neighbors
+                 ;And the number of live neigbors is less than 2 then the square is dead
+                 [(underpopulation (check-neighbors    
                                     (filter (lambda (p) (member? (squares-position p) (squares-neighbors (first grid)))) (WS-grd ws))
                                     0))
                   (make-new-grid ws
                                  (rest grid)
                                  (cons (make-squares (squares-position (first grid)) false (squares-neighbors (first grid))) new-grid))]
+                 ;And the number of live neighbors is more than 3 then the square is dead
                  [(overpopulation (check-neighbors
                                    (filter (lambda (p) (member? (squares-position p) (squares-neighbors (first grid)))) (WS-grd ws))
                                    0))
                   (make-new-grid ws
                                  (rest grid)
                                  (cons (make-squares (squares-position (first grid)) false (squares-neighbors (first grid))) new-grid))]
+                 ;Else the number of neighbors will be 2 or three so the square stays alive
                  [else (make-new-grid ws (rest grid) (cons (first grid) new-grid))])]
+              ;Since the square is not alive
+              ;If the number of neighbors = 3 then the square comes alive
               [(reproduction (check-neighbors
                               (filter (lambda (p) (member? (squares-position p) (squares-neighbors (first grid)))) (WS-grd ws))
                               0))
                (make-new-grid ws
                               (rest grid)
                               (cons (make-squares (squares-position (first grid)) true (squares-neighbors (first grid))) new-grid))]
+              ;Else if dead and neigbors != 3 then the square is still dead
               [else (make-new-grid ws (rest grid) (cons (first grid) new-grid))]))]
     (make-new-grid ws grid (list ))))
    
 
 
-;if active
-; check-live neighbors for the first of the ws-grd using the neighbors function for lon
-; - cond for the rules based on n gathered from check-neighbors
-; - - replace the square based on rules
-; - - append to the rest of the grid
+;If the simulation is active then it updates the board every tick else it just returns the world state
 (define (tock ws)
   (cond
     [(WS-isActive? ws) (update-board ws (WS-grd ws))]
@@ -167,13 +177,15 @@
 
 
 ;======================================TUNRING SQUARES ON OFF=============================================
+;Compares 2 posn and sees if they are equal
 (define (posn=? p1 p2)
   (and (= (posn-x p1) (posn-x p2)) (= (posn-y p1) (posn-y p2))))
 
+;Removes a square from the grid
 (define (replace-square ws grid crd)
   (remove (first grid) (WS-grd ws)))
 
-
+;Replaces a single square from the WS and replaces it with the opposite living state
 (define (change-square ws grid crd)
   (cond
     [(empty? grid)
@@ -193,6 +205,7 @@
               (WS-place-glider? ws))]
     [else (change-square ws (rest grid) crd)]))
 
+;A list of living squares for a glider
 (define (make-glider-list ws x y)
   (list (make-squares (make-posn x (if (> 0 (- y 2)) (+ (- y 2) NumOfSqrs) (- y 2)))
                              true
@@ -225,6 +238,7 @@
                                     (- y 1)
                                     (if (< NumOfSqrs (+ x 1)) (- (+ x 1) NumOfSqrs) (+ x 1))
                                     y))))
+;A list of dead squares to remove from the list to place a glider
 (define (make-dead-glider-list ws x y)
   (list (make-squares (make-posn x (if (> 0 (- y 2)) (+ (- y 2) NumOfSqrs) (- y 2)))
                              false
@@ -258,6 +272,7 @@
                                     (if (< NumOfSqrs (+ x 1)) (- (+ x 1) NumOfSqrs) (+ x 1))
                                     y))))
 
+;Combines the living glider list with the world grid without those squares
 (define (place-glider ws glider-crds dead-glider-crds)
   (make-WS
    (append glider-crds
@@ -266,7 +281,7 @@
    (WS-place-glider? ws)))
 
 ;=========================================================================================================
-
+;Main Function
 (define (main ws)
   (big-bang ws
     [on-draw render]
