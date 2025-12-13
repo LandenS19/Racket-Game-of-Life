@@ -8,8 +8,8 @@
 
 (define liveCell (overlay (square SQ-SZ 'outline "black") (square SQ-SZ 'solid "white")))
 (define BACKGROUND (square W-SIZE 'solid "black"))
-(define-struct WS (grd isActive?))
-(define-struct squares (position isLiving? neighbors)) 
+(define-struct WS (grd isActive? place-glider?))
+(define-struct squares (position isLiving? neighbors))
 
 ;=======================================MAKING THE WORLD==============================================
 ;list of neighbors {Give the position -1 EX: (neighbors (- (posn-x ws) 1) (- (posn-y ws) 1))}
@@ -19,13 +19,9 @@
     [(< y 1) (set-neighbors x NumOfSqrs x1 y1)]
     [(> x NumOfSqrs) (set-neighbors 1 y x1 y1)]
     [(> y NumOfSqrs) (set-neighbors x 1 x1 y1)]
-    [(= x (if
-           (>= (+ x1 2) (+ NumOfSqrs 1))
-           (- (+ x1 2) NumOfSqrs) (+ x1 2)))
-        (set-neighbors (- x1 1) (+ y 1) x1 y1)]
-    [(= y (if
-           (>= (+ y1 2) (+ NumOfSqrs 1))
-           (- (+ y1 2) NumOfSqrs) (+ y1 2))) empty]
+    [(= x (if (>= (+ x1 2) (+ NumOfSqrs 1)) (- (+ x1 2) NumOfSqrs) (+ x1 2)))
+     (set-neighbors (- x1 1) (+ y 1) x1 y1)]
+    [(= y (if (>= (+ y1 2) (+ NumOfSqrs 1)) (- (+ y1 2) NumOfSqrs) (+ y1 2))) empty]
     [(and (= x x1) (= y y1)) (set-neighbors (+ x1 1) y x1 y1)]
     [else (cons (make-posn x y) (set-neighbors (+ x 1) y x1 y1))]))
 
@@ -37,7 +33,7 @@
 
 (define STARTING-GRID (generate-grid 1 1))
 
-(define INIT-WS (make-WS STARTING-GRID false))
+(define INIT-WS (make-WS STARTING-GRID false false))
 
 (define (draw-grid ws grid image)
   (local [(define (place-grid ws grid new-grid)
@@ -68,7 +64,9 @@
     [(key=? key "r")
      INIT-WS]
     [(key=? key " ")
-     (make-WS (WS-grd ws) (if (WS-isActive? ws) false true))]
+     (make-WS (WS-grd ws) (if (WS-isActive? ws) false true) (WS-place-glider? ws))]
+    [(key=? key "1")
+     (make-WS (WS-grd ws) (WS-isActive? ws) (if (WS-place-glider? ws) false true))]
     [else ws]))
 
 
@@ -80,7 +78,18 @@
 (define (mouse-handler ws x y mouse )
   (cond
     [(string=? mouse "button-down")
-     (change-square ws (WS-grd ws) (make-posn (make-simple x 0 SQ-SZ 1) (make-simple y 0 SQ-SZ 1)))]
+     (cond
+       [(WS-place-glider? ws) (place-glider
+                               ws
+                               (make-glider-list
+                                ws
+                               (make-simple x 0 SQ-SZ 1)
+                               (make-simple y 0 SQ-SZ 1))
+                               (make-dead-glider-list
+                                ws
+                                (make-simple x 0 SQ-SZ 1)
+                                (make-simple y 0 SQ-SZ 1)))]
+       [else (change-square ws (WS-grd ws) (make-posn (make-simple x 0 SQ-SZ 1) (make-simple y 0 SQ-SZ 1)))])]
     [else ws]))
 
 ;========================================SIMULATION HARDWARE=============================================
@@ -115,11 +124,11 @@
     ))
 
 ;Update Board
-;handles generating a new board every update
+;handles generating a new board every update 
 (define (update-board ws grid)
   (local [(define (make-new-grid ws grid new-grid)
             (cond
-              [(empty? grid) (make-WS new-grid (WS-isActive? ws))]
+              [(empty? grid) (make-WS new-grid (WS-isActive? ws) (WS-place-glider? ws))]
               [(squares-isLiving? (first grid))
                (cond
                  [(underpopulation (check-neighbors
@@ -175,12 +184,87 @@
         true
         (set-neighbors (- (posn-x crd) 1) (- (posn-y crd) 1) (posn-x crd) (posn-y crd)))
        (WS-grd ws))
-      (WS-isActive? ws))]
+      (WS-isActive? ws)
+      (WS-place-glider? ws))]
     [(posn=? (squares-position (first grid)) crd)
      (make-WS (append (replace-square ws grid crd)
-                      (cons (make-squares crd (if (squares-isLiving? (first grid)) false true) (squares-neighbors (first grid))) empty)) (WS-isActive? ws))]
+                      (cons (make-squares crd (if (squares-isLiving? (first grid)) false true) (squares-neighbors (first grid))) empty))
+              (WS-isActive? ws)
+              (WS-place-glider? ws))]
     [else (change-square ws (rest grid) crd)]))
-   
+
+(define (make-glider-list ws x y)
+  (list (make-squares (make-posn x (if (> 0 (- y 2)) (+ (- y 2) NumOfSqrs) (- y 2)))
+                             true
+                             (set-neighbors (- x 1)
+                                            (- (if (> 0 (- y 2)) (+ (- y 2) NumOfSqrs) (- y 2)) 1)
+                                            x
+                                            (if (> 0 (- y 2)) (+ (- y 2) NumOfSqrs) (- y 2))))
+        (make-squares (make-posn (if (> 0 (- x 1)) (+ (- x 1) NumOfSqrs) (- x 1))
+                                 (if (> 0 (- y 1)) (+ (- y 1) NumOfSqrs) (- y 1)))
+                             true
+                             (set-neighbors (- (if (> 0 (- x 1)) (+ (- x 1) NumOfSqrs) (- x 1)) 1)
+                                            (- (if (> 0 (- y 1)) (+ (- y 1) NumOfSqrs) (- y 1)) 1)
+                                            (if (> 0 (- x 1)) (+ (- x 1) NumOfSqrs) (- x 1))
+                                            (if (> 0 (- y 1)) (+ (- y 1) NumOfSqrs) (- y 1))))
+        (make-squares (make-posn (if (> 0 (- x 1)) (+ (- x 1) NumOfSqrs) (- x 1)) y)
+                     true
+                     (set-neighbors (- (if (> 0 (- x 1)) (+ (- x 1) NumOfSqrs) (- x 1)) 1)
+                                    (- y 1)
+                                    (if (> 0 (- x 1)) (+ (- x 1) NumOfSqrs) (- x 1))
+                                    y))
+        (make-squares (make-posn x y)
+                     true
+                     (set-neighbors (- x 1)
+                                    (- y 1)
+                                    x
+                                    y))
+        (make-squares (make-posn (if (< NumOfSqrs (+ x 1)) (- (+ x 1) NumOfSqrs) (+ x 1)) y)
+                     true
+                     (set-neighbors (- (if (< NumOfSqrs (+ x 1)) (- (+ x 1) NumOfSqrs) (+ x 1)) 1)
+                                    (- y 1)
+                                    (if (< NumOfSqrs (+ x 1)) (- (+ x 1) NumOfSqrs) (+ x 1))
+                                    y))))
+(define (make-dead-glider-list ws x y)
+  (list (make-squares (make-posn x (if (> 0 (- y 2)) (+ (- y 2) NumOfSqrs) (- y 2)))
+                             false
+                             (set-neighbors (- x 1)
+                                            (- (if (> 0 (- y 2)) (+ (- y 2) NumOfSqrs) (- y 2)) 1)
+                                            x
+                                            (if (> 0 (- y 2)) (+ (- y 2) NumOfSqrs) (- y 2))))
+        (make-squares (make-posn (if (> 0 (- x 1)) (+ (- x 1) NumOfSqrs) (- x 1))
+                                 (if (> 0 (- y 1)) (+ (- y 1) NumOfSqrs) (- y 1)))
+                             false
+                             (set-neighbors (- (if (> 0 (- x 1)) (+ (- x 1) NumOfSqrs) (- x 1)) 1)
+                                            (- (if (> 0 (- y 1)) (+ (- y 1) NumOfSqrs) (- y 1)) 1)
+                                            (if (> 0 (- x 1)) (+ (- x 1) NumOfSqrs) (- x 1))
+                                            (if (> 0 (- y 1)) (+ (- y 1) NumOfSqrs) (- y 1))))
+        (make-squares (make-posn (if (> 0 (- x 1)) (+ (- x 1) NumOfSqrs) (- x 1)) y)
+                     false
+                     (set-neighbors (- (if (> 0 (- x 1)) (+ (- x 1) NumOfSqrs) (- x 1)) 1)
+                                    (- y 1)
+                                    (if (> 0 (- x 1)) (+ (- x 1) NumOfSqrs) (- x 1))
+                                    y))
+        (make-squares (make-posn x y)
+                     false
+                     (set-neighbors (- x 1)
+                                    (- y 1)
+                                    x
+                                    y))
+        (make-squares (make-posn (if (< NumOfSqrs (+ x 1)) (- (+ x 1) NumOfSqrs) (+ x 1)) y)
+                     false
+                     (set-neighbors (- (if (< NumOfSqrs (+ x 1)) (- (+ x 1) NumOfSqrs) (+ x 1)) 1)
+                                    (- y 1)
+                                    (if (< NumOfSqrs (+ x 1)) (- (+ x 1) NumOfSqrs) (+ x 1))
+                                    y))))
+
+(define (place-glider ws glider-crds dead-glider-crds)
+  (make-WS
+   (append glider-crds
+          (filter (lambda (p) (not (or (member? p glider-crds) (member? p dead-glider-crds)))) (WS-grd ws)))
+   (WS-isActive? ws)
+   (WS-place-glider? ws)))
+
 ;=========================================================================================================
 
 (define (main ws)
